@@ -15,11 +15,18 @@ It uses the GitHub REST API and reports:
 - Dependabot config status
 - workflow count
 - workflow permission hints
+- a simple summary level: `ok`, `warning`, or `needs_review`
 
 ## Use
 
 ```bash
 python check_repo.py owner/repo
+```
+
+For a shorter human-readable report:
+
+```bash
+python check_repo.py owner/repo --summary
 ```
 
 For higher rate limits or private repos, set a GitHub token first:
@@ -56,8 +63,25 @@ python check_repo.py FxckingAngel/github-security-checkup
   "security_policy": "missing",
   "dependabot_config": "missing",
   "workflow_count": 0,
-  "workflow_permission_hints": "no workflow directory"
+  "workflow_permission_hints": "no workflow directory",
+  "summary": {
+    "level": "warning",
+    "ok": 2,
+    "warnings": 3,
+    "needs_review": 0
+  }
 }
+```
+
+Summary output:
+
+```text
+repo: FxckingAngel/github-security-checkup
+level: warning
+- ok: license (MIT)
+  License detected.
+- warning: branch_protection (not enabled or not visible)
+  Enable branch protection for important repos.
 ```
 
 ## Why
@@ -71,6 +95,7 @@ It does not replace a real security audit. It helps spot basic repo hygiene issu
 - branch protection details when visible
 - release/signing checks
 - repository ruleset checks
+- multiple repo scan mode
 
 ## License
 

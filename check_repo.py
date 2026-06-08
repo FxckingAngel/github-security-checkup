@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import sys
@@ -109,12 +110,103 @@ def workflow_permission_hints(owner, repo):
     }
 
 
+def add_check(checks, name, status, level, note):
+    checks.append({
+        "name": name,
+        "status": status,
+        "level": level,
+        "note": note,
+    })
+
+
+def build_checks(report):
+    checks = []
+
+    add_check(
+        checks,
+        "license",
+        report["license"],
+        "ok" if report["license"] != "missing" else "needs_review",
+        "Add a license so users know how the code can be used." if report["license"] == "missing" else "License detected.",
+    )
+    add_check(
+        checks,
+        "security_policy",
+        report["security_policy"],
+        "ok" if report["security_policy"] == "present" else "warning",
+        "Add SECURITY.md for vulnerability reporting." if report["security_policy"] != "present" else "Security policy detected.",
+    )
+    add_check(
+        checks,
+        "dependabot_config",
+        report["dependabot_config"],
+        "ok" if report["dependabot_config"] == "present" else "warning",
+        "Add .github/dependabot.yml for dependency updates." if report["dependabot_config"] != "present" else "Dependabot config detected.",
+    )
+    add_check(
+        checks,
+        "branch_protection",
+        report["branch_protection"],
+        "ok" if report["branch_protection"] == "enabled" else "warning",
+        "Enable branch protection for important repos." if report["branch_protection"] != "enabled" else "Default branch protection detected.",
+    )
+
+    workflow_hints = report["workflow_permission_hints"]
+    if isinstance(workflow_hints, dict):
+        if workflow_hints["write_permissions"]:
+            add_check(
+                checks,
+                "workflow_permissions",
+                "write permissions found",
+                "needs_review",
+                "Review workflows with write permissions.",
+            )
+        elif workflow_hints["missing_permissions_block"]:
+            add_check(
+                checks,
+                "workflow_permissions",
+                "permissions block missing",
+                "warning",
+                "Add explicit read-only permissions where possible.",
+            )
+        else:
+            add_check(checks, "workflow_permissions", "explicit", "ok", "Workflow permissions look explicit.")
+    else:
+        add_check(checks, "workflow_permissions", workflow_hints, "ok", "No workflow permission risk found.")
+
+    return checks
+
+
+def summary_level(checks):
+    if any(check["level"] == "needs_review" for check in checks):
+        return "needs_review"
+    if any(check["level"] == "warning" for check in checks):
+        return "warning"
+    return "ok"
+
+
+def print_summary(report):
+    print(f"repo: {report['repo']}")
+    print(f"level: {report['summary']['level']}")
+    for check in report["checks"]:
+        print(f"- {check['level']}: {check['name']} ({check['status']})")
+        print(f"  {check['note']}")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Check basic GitHub repository security signals.")
+    parser.add_argument("repo", help="Repository in owner/repo form.")
+    parser.add_argument("--summary", action="store_true", help="Print a human-readable summary instead of JSON.")
+    return parser.parse_args()
+
+
 def main():
-    if len(sys.argv) != 2 or "/" not in sys.argv[1]:
+    args = parse_args()
+    if "/" not in args.repo:
         print("usage: python check_repo.py owner/repo")
         return 2
 
-    owner, repo = sys.argv[1].split("/", 1)
+    owner, repo = args.repo.split("/", 1)
     status, data = request_json(f"/repos/{owner}/{repo}")
     if status != 200:
         print(f"failed to fetch repo: {status} {data.get('message', 'no message')}")
@@ -136,8 +228,19 @@ def main():
         "workflow_count": workflows_status(owner, repo),
         "workflow_permission_hints": workflow_permission_hints(owner, repo),
     }
+    checks = build_checks(report)
+    report["summary"] = {
+        "level": summary_level(checks),
+        "ok": sum(1 for check in checks if check["level"] == "ok"),
+        "warnings": sum(1 for check in checks if check["level"] == "warning"),
+        "needs_review": sum(1 for check in checks if check["level"] == "needs_review"),
+    }
+    report["checks"] = checks
 
-    print(json.dumps(report, indent=2))
+    if args.summary:
+        print_summary(report)
+    else:
+        print(json.dumps(report, indent=2))
     return 0
 
 
