@@ -10,6 +10,11 @@ It uses the GitHub REST API and reports:
 - open issue count
 - last pushed date
 - default branch protection status
+- license status
+- security policy status
+- Dependabot config status
+- workflow count
+- workflow permission hints
 
 ## Use
 
@@ -46,7 +51,12 @@ python check_repo.py FxckingAngel/github-security-checkup
   "default_branch": "main",
   "open_issues": 0,
   "pushed_at": "2026-06-08T01:31:22Z",
-  "branch_protection": "not enabled or not visible"
+  "branch_protection": "not enabled or not visible",
+  "license": "MIT",
+  "security_policy": "missing",
+  "dependabot_config": "missing",
+  "workflow_count": 0,
+  "workflow_permission_hints": "no workflow directory"
 }
 ```
 
@@ -58,11 +68,9 @@ It does not replace a real security audit. It helps spot basic repo hygiene issu
 
 ## Checks To Add
 
-- license detection
-- Dependabot config check
-- security policy check
-- workflow permissions check
 - branch protection details when visible
+- release/signing checks
+- repository ruleset checks
 
 ## License
 
